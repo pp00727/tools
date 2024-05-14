@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# 设置批处理的大小
+batch_size=5
+
+# 获取同级目录下的所有目录
+directories=( */ )
+
+# 计算需要处理的批次数量
+total_directories=${#directories[@]}
+batches=$((total_directories / batch_size))
+if ((total_directories % batch_size > 0)); then
+    ((batches++))
+fi
+
+# 对每个批次执行命令
+for ((batch=0; batch<batches; batch++)); do
+    start_index=$((batch * batch_size))
+    end_index=$((start_index + batch_size - 1))
+    
+    # 如果这是最后一个批次，并且目录数量不能被批次大小整除，则调整结束索引
+    if ((batch == batches - 1)) && ((total_directories % batch_size != 0)); then
+        end_index=$((start_index + total_directories % batch_size - 1))
+    fi
+    
+    # 构建当前批次的目录列表
+    batch_directories=("${directories[@]:start_index:end_index-start_index+1}")
+    
+    # 对当前批次的目录执行命令
+    for dir in "${batch_directories[@]}"; do
+        echo "Processing directory $dir"
+        # 进入目录
+        (
+            cd "$dir" || exit
+            # 复制INCAR_single文件到当前目录并重命名为INCAR
+            if [ -f "../INCAR_single" ]; then
+                cp "../INCAR_single" "INCAR"
+                echo "Copied INCAR_single to $dir and renamed to INCAR"
+            else
+                echo "INCAR_single not found in parent directory."
+            fi
+            # 执行mpirun命令
+            mpirun -np 4 vasp_std
+        )
+    done
+done
